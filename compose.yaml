@@ -1,0 +1,44 @@
+services:
+  mysql-service:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: demo
+      MYSQL_USER: ${MYSQL_USER:-demo}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-demo_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./springboot/app
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-service:3306/demo
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-demo}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-demo_password}
+      APP_CORS_ALLOWED_ORIGIN: http://localhost:8083
+    depends_on:
+      mysql-service:
+        condition: service_healthy
+    expose:
+      - "8081"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./angular-app
+    depends_on:
+      - backend
+    ports:
+      - "8083:80"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
